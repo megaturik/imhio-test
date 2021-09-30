@@ -1,0 +1,9 @@
+---
+- hosts:  
+  remote_user: root
+  gather_facts: no
+  
+  roles:
+    - common
+    - {role: percona, tags: percona}
+    - {role: tcg, tags: tcg}

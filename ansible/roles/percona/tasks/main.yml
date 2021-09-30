@@ -1,0 +1,76 @@
+---
+- name: check if exists mysql db directory
+  stat: 
+    path: /var/lib/mysql/
+  register: mysql
+
+- block:
+
+  - name: Remove my.cnf provided with mariadblibs by default
+    file:
+      path: /etc/my.cnf
+      state: absent  
+
+  - name: Install percona repo
+    yum:
+      name: https://repo.percona.com/yum/percona-release-latest.noarch.rpm
+      state: present
+
+  - name: setup percona repo
+    shell: percona-release setup ps57
+
+  - name: install Percona-Server
+    yum:
+      name: Percona-Server-server-57
+      state: present
+
+  - name: start Percona-Server
+    service:
+      name: mysql
+      state: started
+
+  - name: create mysqld.cnf
+    template:
+      src: mysqld.cnf.j2
+      dest: "/etc/percona-server.conf.d/mysqld.cnf"
+      owner: root
+      group: root
+      mode: 0644
+  
+  - name: restart Percona-Server
+    service:
+      name: mysql
+      state: restarted    
+
+  - name: "Searching for Percona temprorary root password"
+    register: "percona_temp_password"
+    shell: "sed -rn 's/.*A temporary password is generated for root@localhost: (.*)/\\1/p' /var/log/mysqld.log"
+    
+  - set_fact:
+      percona_new_password: "{{ lookup('password', '/dev/null length=20 chars=][%@+|-_;$:^#!?~,digits,ascii_letters') }}"
+
+  - debug:
+      msg: mysqladmin -uroot -p'{{percona_temp_password.stdout}}' password '{{ percona_new_password }}'
+
+  - name: "Set new percona root password"
+    shell: mysqladmin -uroot -p'{{percona_temp_password.stdout}}' password '{{ percona_new_password }}'
+
+  - name: create /root/.my.cnf
+    template:
+      src: my.cnf.j2
+      dest: "/root/.my.cnf"
+      owner: root
+      group: root
+      mode: 0600      
+      
+  - name: enable service Percona-Server
+    systemd:
+      name: mysql
+      enabled: yes
+
+  when: mysql.stat.exists == False
+
+- debug:
+    msg: /var/lib/mysql already exists, aborting installation.
+  when: mysql.stat.exists == True
+  

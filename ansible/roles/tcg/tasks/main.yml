@@ -1,0 +1,46 @@
+- name: Download tcg.rpm
+  get_url:
+    url: https://cloud.imhio.com/s/wFznArF4LsB7kfW/download
+    dest: /root/tcg.rpm
+    
+- name: install tcg
+  yum:
+    pkg: /root/tcg.rpm
+    state: installed    
+    
+- set_fact:
+      tcg_mysql_password: "{{ lookup('password', '/dev/null length=20 chars=][%@+|-_;$:^#!?~,digits,ascii_letters') }}"
+
+- name: Create database user for tcg with name "{{tcg_mysql_user}}"
+  mysql_user:
+    name: "{{tcg_mysql_user}}"
+    host: "127.0.0.1"
+    password: "{{tcg_mysql_password}}"
+    priv: '{{tcg_mysql_db}}.*:ALL PRIVILEGES'
+    state: present
+    login_unix_socket: '/var/lib/mysql/mysql.sock'
+
+- name: Create a new database with name "{{tcg_mysql_db}}"
+  mysql_db:
+    name: "{{tcg_mysql_db}}"
+    state: present
+    login_unix_socket: '/var/lib/mysql/mysql.sock'  
+
+- name: create config for tcg
+  template:
+    src: tcg.json.j2
+    dest: /etc/tcg/tcg.json
+    owner: tcg
+    group: tcg
+    mode: 0600
+
+- name: enable service tcg
+  systemd:
+    name: tcg
+    enabled: yes
+
+- name: start tcg
+  service: 
+    name: tcg
+    state: started
+    

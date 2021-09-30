@@ -1,0 +1,31 @@
+---
+- name: Ensure SELinux is set to disabled mode
+  lineinfile:
+    path: /etc/selinux/config
+    regexp: '^SELINUX='
+    line: SELINUX=disabled
+
+- name: "setenforce 0"
+  ignore_errors: yes
+  shell: setenforce 0
+    
+- name: check if exists epel.repo
+  stat: 
+    path: /etc/yum.repos.d/epel.repo
+  register: epel
+
+- name: Install EPEL REPO
+  yum:
+    name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+    state: present
+  when: epel.stat.exists == False
+  
+- name: install some basic stuff 
+  yum:
+    name:
+      - mysql-connector-python
+      - python2-PyMySQL
+    state: present 
+
+
+
